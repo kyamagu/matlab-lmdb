@@ -3,14 +3,8 @@ Matlab LMDB
 
 Matlab LMDB wrapper.
 
-The implementation is based on [mexplus](http://github.com/kyamagu/mexplus).
-
-Prerequisite
-------------
-
- * [LMDB](http://symas.com/mdb/)
-
-You may install LMDB via a package manager, such as `apt-get`.
+ * See [LMDB website](http://symas.com/mdb/).
+ * The implementation is based on [mexplus](http://github.com/kyamagu/mexplus).
 
 Build
 -----
@@ -21,6 +15,7 @@ Build
 To specify optional build flags:
 
     lmdb.make('all', '-I/opt/local/include -L/opt/local/lib');
+    lmdb.make('clean');
 
 Run a test:
 
@@ -31,7 +26,8 @@ Example
 
     % Open and close.
     database = lmdb.DB('./db');
-    clear database;
+    readonly_database = lmdb.DB('./db', 'RDONLY');
+    clear readonly_database;
 
     % Read and write.
     database.put('key1', 'value1');
@@ -42,3 +38,8 @@ Example
     % Iterator.
     database.each(@(key, value) disp([key, ': ', value]));
     count = database.reduce(@(key, value, count) count + 1, 0);
+
+TODO
+----
+
+ * Finer transaction API.

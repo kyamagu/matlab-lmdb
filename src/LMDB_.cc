@@ -14,29 +14,16 @@ using namespace mexplus;
 
 namespace mexplus {
 
-// Template specialization of MDB_val to mxArray*.
+// Template specialization of MDB_val to mxArray*. For interoperability, use
+// string to keep any data.
 template <>
 mxArray* MxArray::from(const MDB_val& value) {
-  mwSize length = static_cast<mwSize>(value.mv_size / sizeof(mxChar));
-  const mwSize dimensions[] = {1, length};
-  mxArray* array = mxCreateCharArray(2, dimensions);
-  ASSERT(array, "Null pointer exception.");
-  mxChar* value_str = reinterpret_cast<mxChar*>(value.mv_data);
-  copy(value_str, value_str + length, mxGetChars(array));
-  return array;
+  const char* value_data = reinterpret_cast<const char*>(value.mv_data);
+  return MxArray::from(string(value_data, value_data + value.mv_size));
 }
 
-// Template specialization of mxArray* to MDB_val.
-template <>
-void MxArray::to(const mxArray* array, MDB_val* value) {
-  ASSERT(array, "Null pointer exception.");
-  ASSERT(value, "Null pointer exception.");
-  ASSERT(mxIsChar(array),
-         "Expected a char array but %s.",
-         mxGetClassName(array));
-  value->mv_size = sizeof(mxChar) * mxGetNumberOfElements(array);
-  value->mv_data = mxGetChars(array);
-}
+// Note that MxArray::to() is not trivial due to malloc() and free() issue.
+// Perhaps a good approach is to wrap MDB_val to implement a destructor.
 
 // Transaction manager.
 class Transaction {
@@ -182,7 +169,8 @@ MEX_DEFINE(get) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 2);
   OutputArguments output(nlhs, plhs, 1);
   Database* database = Session<Database>::get(input.get(0));
-  MDB_val mdb_key = input.get<MDB_val>(1);
+  string key_string(input.get<string>(1));
+  MDB_val mdb_key = {key_string.size(), const_cast<char*>(key_string.c_str())};
   MDB_val mdb_value = {0, NULL};
   Transaction transaction;
   transaction.begin(database->getEnv(), MDB_RDONLY);
@@ -207,8 +195,11 @@ MEX_DEFINE(put) (int nlhs, mxArray* plhs[],
       ((input.get<bool>("NOOVERWRITE", false)) ? MDB_NOOVERWRITE : 0) |
       ((input.get<bool>("RESERVE", false)) ? MDB_RESERVE : 0) |
       ((input.get<bool>("APPEND", false)) ? MDB_APPEND : 0);
-  MDB_val mdb_key = input.get<MDB_val>(1);
-  MDB_val mdb_value = input.get<MDB_val>(2);
+  string key_string(input.get<string>(1));
+  string value_string(input.get<string>(2));
+  MDB_val mdb_key = {key_string.size(), const_cast<char*>(key_string.c_str())};
+  MDB_val mdb_value = {value_string.size(),
+                       const_cast<char*>(value_string.c_str())};
   Transaction transaction;
   transaction.begin(database->getEnv(), 0);
   int status = mdb_put(transaction.get(),
@@ -225,7 +216,8 @@ MEX_DEFINE(remove) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 2);
   OutputArguments output(nlhs, plhs, 0);
   Database* database = Session<Database>::get(input.get(0));
-  MDB_val mdb_key = input.get<MDB_val>(1);
+  string key_string(input.get<string>(1));
+  MDB_val mdb_key = {key_string.size(), const_cast<char*>(key_string.c_str())};
   Transaction transaction;
   transaction.begin(database->getEnv(), 0);
   int status = mdb_del(transaction.get(), database->getDBI(), &mdb_key, NULL);

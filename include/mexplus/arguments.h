@@ -34,27 +34,6 @@
 #include <sstream>
 #include <stdarg.h>
 
-namespace {
-
-/** Case-insensitive comparator for std::string.
- */
-struct CaseInsensitiveComparator {
-  struct CaseInsensitiveElementComparator {
-    bool operator() (const char& c1, const char& c2) const {
-        return tolower(c1) < tolower(c2);
-    }
-  };
-  bool operator() (const std::string & s1, const std::string & s2) const {
-    return std::lexicographical_compare(s1.begin(),
-                                        s1.end(),
-                                        s2.begin(),
-                                        s2.end(),
-                                        CaseInsensitiveElementComparator());
-  }
-};
-
-} // namespace
-
 namespace mexplus {
 
 /** Utility to parse input arguments.
@@ -86,6 +65,23 @@ namespace mexplus {
  */
 class InputArguments {
 public:
+  /** Case-insensitive comparator for std::string.
+   */
+  struct CaseInsensitiveComparator {
+    struct CaseInsensitiveElementComparator {
+      bool operator() (const char& c1, const char& c2) const {
+          return tolower(c1) < tolower(c2);
+      }
+    };
+    bool operator() (const std::string & s1, const std::string & s2) const {
+      return std::lexicographical_compare(s1.begin(),
+                                          s1.end(),
+                                          s2.begin(),
+                                          s2.end(),
+                                          CaseInsensitiveElementComparator());
+    }
+  };
+
   typedef std::map<std::string, const mxArray*, CaseInsensitiveComparator>
       OptionMap;
   /** Definition of arguments.

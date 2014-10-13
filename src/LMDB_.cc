@@ -108,6 +108,10 @@ public:
     }
     env_ = NULL;
   }
+  void setMapsize(size_t mapsize) {
+    int status = mdb_env_set_mapsize(env_, mapsize);
+    ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
+  }
   MDB_env* getEnv() { return env_; }
   MDB_dbi getDBI() { return dbi_; }
 
@@ -118,14 +122,14 @@ private:
 
 MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
                  int nrhs, const mxArray* prhs[]) {
-  InputArguments input(nrhs, prhs, 1, 19, "MODE", "FIXEDMAP", "NOSUBDIR",
+  InputArguments input(nrhs, prhs, 1, 20, "MODE", "FIXEDMAP", "NOSUBDIR",
     "NOSYNC", "RDONLY", "NOMETASYNC", "WRITEMAP", "MAPASYNC", "NOTLS",
     "NOLOCK", "NORDAHEAD", "NOMEMINIT", "REVERSEKEY", "DUPSORT", "INTEGERKEY",
-    "DUPFIXED", "INTEGERDUP", "REVERSEDUP", "CREATE");
+    "DUPFIXED", "INTEGERDUP", "REVERSEDUP", "CREATE", "MAPSIZE");
   OutputArguments output(nlhs, plhs, 1);
-  // C-style.
   std::unique_ptr<Database> database(new Database);
   ASSERT(database.get() != NULL, "Null pointer exception.");
+  database->setMapsize(input.get<int>("MAPSIZE", 10485760));
   string filename(input.get<string>(0));
   mdb_mode_t mode = input.get<int>("MODE", 0664);
   unsigned int flags =

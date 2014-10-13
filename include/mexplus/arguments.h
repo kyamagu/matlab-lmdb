@@ -36,13 +36,11 @@
 
 namespace {
 
-/** Case-independent (ci) compare_less binary function.
+/** Case-insensitive comparator for std::string.
  */
-struct CaseInsensitiveLess : std::binary_function<std::string, std::string,
-    bool> {
-  struct nocase_compare : public std::binary_function<unsigned char,
-      unsigned char,bool> {
-    bool operator() (const unsigned char& c1, const unsigned char& c2) const {
+struct CaseInsensitiveComparator {
+  struct CaseInsensitiveElementComparator {
+    bool operator() (const char& c1, const char& c2) const {
         return tolower(c1) < tolower(c2);
     }
   };
@@ -51,7 +49,7 @@ struct CaseInsensitiveLess : std::binary_function<std::string, std::string,
                                         s1.end(),
                                         s2.begin(),
                                         s2.end(),
-                                        nocase_compare());
+                                        CaseInsensitiveElementComparator());
   }
 };
 
@@ -88,7 +86,8 @@ namespace mexplus {
  */
 class InputArguments {
 public:
-  typedef std::map<std::string, const mxArray*, CaseInsensitiveLess> OptionMap;
+  typedef std::map<std::string, const mxArray*, CaseInsensitiveComparator>
+      OptionMap;
   /** Definition of arguments.
    */
   typedef struct Definition_tag {
@@ -208,7 +207,7 @@ private:
   void fillOptionalDefinition(int option_size,
                               OptionMap* optionals,
                               va_list variable_list) {
-  for (int i = 0; i < option_size; ++i) {
+    for (int i = 0; i < option_size; ++i) {
       const char* option_name = va_arg(variable_list, const char*);
       (*optionals)[std::string(option_name)] = NULL;
     }

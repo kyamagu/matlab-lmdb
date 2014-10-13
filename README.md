@@ -26,7 +26,7 @@ Example
 
     % Open and close.
     database = lmdb.DB('./db');
-    readonly_database = lmdb.DB('./db', 'RDONLY');
+    readonly_database = lmdb.DB('./db', 'RDONLY', true);
     clear readonly_database;
 
     % Read and write.

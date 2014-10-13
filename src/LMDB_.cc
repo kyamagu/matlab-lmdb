@@ -25,6 +25,10 @@ mxArray* MxArray::from(const MDB_val& value) {
 // Note that MxArray::to() is not trivial due to malloc() and free() issue.
 // Perhaps a good approach is to wrap MDB_val to implement a destructor.
 
+} // namespace mexplus
+
+namespace {
+
 // Transaction manager.
 class Transaction {
 public:

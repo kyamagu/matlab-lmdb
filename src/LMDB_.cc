@@ -12,30 +12,21 @@ using namespace mexplus;
 #define ASSERT(cond, ...) \
     if (!(cond)) mexErrMsgIdAndTxt("lmdb:error", __VA_ARGS__)
 
-namespace mexplus {
-
-// Template specialization of MDB_val to mxArray*. For interoperability, use
-// string to keep any data.
-template <>
-mxArray* MxArray::from(const MDB_val& value) {
-  const char* value_data = reinterpret_cast<const char*>(value.mv_data);
-  return MxArray::from(string(value_data, value_data + value.mv_size));
-}
-
-// Note that MxArray::to() is not trivial due to malloc() and free() issue.
-// Perhaps a good approach is to wrap MDB_val to implement a destructor.
-
-} // namespace mexplus
-
 namespace {
 
 // Transaction manager.
 class Transaction {
 public:
+  // Create an empty transaction.
   Transaction() : txn_(NULL) {}
+  // Shorthand for constructor-begin.
+  Transaction(MDB_env* env, unsigned int flags) : txn_(NULL) {
+    begin(env, flags);
+  }
   virtual ~Transaction() { abort(); }
   // Begin the transaction.
   void begin(MDB_env* env, unsigned int flags) {
+    ASSERT(env, "Null pointer exception.");
     abort();
     int status = mdb_txn_begin(env, NULL, flags, &txn_);
     ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
@@ -124,6 +115,66 @@ private:
   MDB_dbi dbi_;
 };
 
+// Record wrapper.
+class Record {
+public:
+  // Create an empty record.
+  Record() {
+    mdb_val_.mv_size = 0;
+    mdb_val_.mv_data = NULL;
+  }
+  // Create from string.
+  Record(const string& data) {
+    initialize(data);
+  }
+  // Initialize with string.
+  void initialize(const string& data) {
+    data_.assign(data.begin(), data.end());
+    mdb_val_.mv_size = data_.size();
+    mdb_val_.mv_data = const_cast<char*>(data_.c_str());
+  }
+  // Get MDB_val pointer.
+  MDB_val* get() { return &mdb_val_; }
+  // Beginning of iterator.
+  const char* begin() const {
+    return reinterpret_cast<const char*>(mdb_val_.mv_data);
+  }
+  // End of iterator.
+  const char* end() const {
+    return begin() + mdb_val_.mv_size;
+  }
+
+private:
+  // Data buffer.
+  string data_;
+  // Dumb MDB_val.
+  MDB_val mdb_val_;
+};
+
+} // namespace
+
+namespace mexplus {
+
+// Template specialization of mxArray* to Record.
+template <>
+void MxArray::to(const mxArray* array, Record* value) {
+  ASSERT(value, "Null pointer exception.");
+  value->initialize(MxArray(array).to<string>());
+}
+
+// Template specialization of Record to mxArray*.
+template <>
+mxArray* MxArray::from(const Record& value) {
+  return MxArray(string(value.begin(), value.end())).release();
+}
+
+// Session instance storage.
+template class Session<Database>;
+
+} // namespace mexplus
+
+namespace {
+
 MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
                  int nrhs, const mxArray* prhs[]) {
   InputArguments input(nrhs, prhs, 1, 20, "MODE", "FIXEDMAP", "NOSUBDIR",
@@ -149,9 +200,8 @@ MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
       ((input.get<bool>("NORDAHEAD", false)) ? MDB_NORDAHEAD : 0) |
       ((input.get<bool>("NOMEMINIT", false)) ? MDB_NOMEMINIT : 0);
   database->openEnv(filename.c_str(), flags, mode);
-  Transaction transaction;
   flags = ((input.get<bool>("RDONLY", false)) ? MDB_RDONLY : 0);
-  transaction.begin(database->getEnv(), flags);
+  Transaction transaction(database->getEnv(), flags);
   flags =
       ((input.get<bool>("REVERSEKEY", false)) ? MDB_REVERSEKEY : 0) |
       ((input.get<bool>("DUPSORT", false)) ? MDB_DUPSORT : 0) |
@@ -177,19 +227,17 @@ MEX_DEFINE(get) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 2);
   OutputArguments output(nlhs, plhs, 1);
   Database* database = Session<Database>::get(input.get(0));
-  string key_string(input.get<string>(1));
-  MDB_val mdb_key = {key_string.size(), const_cast<char*>(key_string.c_str())};
-  MDB_val mdb_value = {0, NULL};
-  Transaction transaction;
-  transaction.begin(database->getEnv(), MDB_RDONLY);
+  Record key = input.get<Record>(1);
+  Record value;
+  Transaction transaction(database->getEnv(), MDB_RDONLY);
   int status = mdb_get(transaction.get(),
                        database->getDBI(),
-                       &mdb_key,
-                       &mdb_value);
+                       key.get(),
+                       value.get());
   ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
          mdb_strerror(status));
   transaction.commit();
-  output.set(0, mdb_value);
+  output.set(0, value);
 }
 
 MEX_DEFINE(put) (int nlhs, mxArray* plhs[],
@@ -203,17 +251,13 @@ MEX_DEFINE(put) (int nlhs, mxArray* plhs[],
       ((input.get<bool>("NOOVERWRITE", false)) ? MDB_NOOVERWRITE : 0) |
       ((input.get<bool>("RESERVE", false)) ? MDB_RESERVE : 0) |
       ((input.get<bool>("APPEND", false)) ? MDB_APPEND : 0);
-  string key_string(input.get<string>(1));
-  string value_string(input.get<string>(2));
-  MDB_val mdb_key = {key_string.size(), const_cast<char*>(key_string.c_str())};
-  MDB_val mdb_value = {value_string.size(),
-                       const_cast<char*>(value_string.c_str())};
-  Transaction transaction;
-  transaction.begin(database->getEnv(), 0);
+  Record key = input.get<Record>(1);
+  Record value = input.get<Record>(2);
+  Transaction transaction(database->getEnv(), 0);
   int status = mdb_put(transaction.get(),
                        database->getDBI(),
-                       &mdb_key,
-                       &mdb_value,
+                       key.get(),
+                       value.get(),
                        flags);
   ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
   transaction.commit();
@@ -224,11 +268,9 @@ MEX_DEFINE(remove) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 2);
   OutputArguments output(nlhs, plhs, 0);
   Database* database = Session<Database>::get(input.get(0));
-  string key_string(input.get<string>(1));
-  MDB_val mdb_key = {key_string.size(), const_cast<char*>(key_string.c_str())};
-  Transaction transaction;
-  transaction.begin(database->getEnv(), 0);
-  int status = mdb_del(transaction.get(), database->getDBI(), &mdb_key, NULL);
+  Record key = input.get<Record>(1);
+  Transaction transaction(database->getEnv(), 0);
+  int status = mdb_del(transaction.get(), database->getDBI(), key.get(), NULL);
   ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
   transaction.commit();
 }
@@ -238,21 +280,19 @@ MEX_DEFINE(each) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 2);
   OutputArguments output(nlhs, plhs, 0);
   Database* database = Session<Database>::get(input.get(0));
-  Transaction transaction;
   Cursor cursor;
-  MDB_val mdb_key;
-  MDB_val mdb_value;
-  transaction.begin(database->getEnv(), MDB_RDONLY);
+  Record key, value;
+  Transaction transaction(database->getEnv(), MDB_RDONLY);
   cursor.open(transaction.get(), database->getDBI());
-  int status = mdb_cursor_get(cursor.get(), &mdb_key, &mdb_value, MDB_NEXT);
+  int status = mdb_cursor_get(cursor.get(), key.get(), value.get(), MDB_NEXT);
   while (status == MDB_SUCCESS) {
-    MxArray key(mdb_key);
-    MxArray value(mdb_value);
+    MxArray key_array(key);
+    MxArray value_array(value);
     mxArray* prhs[] = {const_cast<mxArray*>(input.get(1)),
-                       const_cast<mxArray*>(key.get()),
-                       const_cast<mxArray*>(value.get())};
+                       const_cast<mxArray*>(key_array.get()),
+                       const_cast<mxArray*>(value_array.get())};
     ASSERT(mexCallMATLAB(0, NULL, 3, prhs, "feval") == 0, "Callback failure.");
-    status = mdb_cursor_get(cursor.get(), &mdb_key, &mdb_value, MDB_NEXT);
+    status = mdb_cursor_get(cursor.get(), key.get(), value.get(), MDB_NEXT);
   }
   ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
          mdb_strerror(status));
@@ -265,25 +305,23 @@ MEX_DEFINE(reduce) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 3);
   OutputArguments output(nlhs, plhs, 1);
   Database* database = Session<Database>::get(input.get(0));
-  Transaction transaction;
   Cursor cursor;
-  MDB_val mdb_key;
-  MDB_val mdb_value;
+  Record key, value;
   MxArray accumulation(input.get(2));
-  transaction.begin(database->getEnv(), MDB_RDONLY);
+  Transaction transaction(database->getEnv(), MDB_RDONLY);
   cursor.open(transaction.get(), database->getDBI());
-  int status = mdb_cursor_get(cursor.get(), &mdb_key, &mdb_value, MDB_NEXT);
+  int status = mdb_cursor_get(cursor.get(), key.get(), value.get(), MDB_NEXT);
   while (status == MDB_SUCCESS) {
-    MxArray key(mdb_key);
-    MxArray value(mdb_value);
+    MxArray key_array(key);
+    MxArray value_array(value);
     mxArray* lhs = NULL;
     mxArray* prhs[] = {const_cast<mxArray*>(input.get(1)),
-                       const_cast<mxArray*>(key.get()),
-                       const_cast<mxArray*>(value.get()),
+                       const_cast<mxArray*>(key_array.get()),
+                       const_cast<mxArray*>(value_array.get()),
                        const_cast<mxArray*>(accumulation.get())};
     ASSERT(mexCallMATLAB(1, &lhs, 4, prhs, "feval") == 0, "Callback failure.");
     accumulation.reset(lhs);
-    status = mdb_cursor_get(cursor.get(), &mdb_key, &mdb_value, MDB_NEXT);
+    status = mdb_cursor_get(cursor.get(), key.get(), value.get(), MDB_NEXT);
   }
   ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
          mdb_strerror(status));
@@ -293,8 +331,5 @@ MEX_DEFINE(reduce) (int nlhs, mxArray* plhs[],
 }
 
 } // namespace
-
-// Instance manager for Database.
-template class mexplus::Session<Database>;
 
 MEX_DISPATCH

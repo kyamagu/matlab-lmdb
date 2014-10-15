@@ -23,5 +23,6 @@ function testLMDB
   if exist('_testdb', 'dir')
     rmdir('_testdb', 's');
   end
+  fprintf('SUCCESS\n');
 
 end

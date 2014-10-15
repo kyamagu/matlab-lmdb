@@ -1,6 +1,7 @@
 function testLMDB
 %TESTLMDB Test the functionality of LMDB wrapper.
 
+  addpath(fileparts(fileparts(mfilename('fullpath'))));
   if ~exist('_testdb', 'dir')
     mkdir('_testdb');
   end

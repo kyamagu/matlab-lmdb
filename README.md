@@ -1,25 +1,21 @@
 Matlab LMDB
-==============
+===========
 
-Matlab LMDB wrapper.
+Matlab LMDB wrapper for UNIX environment.
 
  * See [LMDB website](http://symas.com/mdb/).
  * The implementation is based on [mexplus](http://github.com/kyamagu/mexplus).
+
+See also [matlab-leveldb](http://github.com/kyamagu/matlab-leveldb).
 
 Build
 -----
 
     addpath /path/to/matlab-lmdb;
     lmdb.make();
-
-To specify optional build flags:
-
-    lmdb.make('all', '-I/opt/local/include -L/opt/local/lib');
-    lmdb.make('clean');
-
-Run a test:
-
     lmdb.make('test');
+
+Edit `Makefile` to customize the build process.
 
 Example
 -------

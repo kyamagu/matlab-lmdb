@@ -46,11 +46,10 @@ public:
     txn_ = NULL;
   }
   // Get the raw transaction pointer.
-  MDB_txn* get() {
-    return txn_;
-  }
+  MDB_txn* get() { return txn_; }
 
 private:
+  // MDB_txn pointer.
   MDB_txn* txn_;
 };
 
@@ -75,27 +74,32 @@ public:
   MDB_cursor* get() { return cursor_; }
 
 private:
+  // MDB_cursor pointer.
   MDB_cursor* cursor_;
 };
 
 // Database manager.
 class Database {
 public:
+  // Create an empty database environment.
   Database() : env_(NULL) {
     int status = mdb_env_create(&env_);
     ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
   }
   virtual ~Database() { close(); }
+  // Open an environment.
   void openEnv(const char* filename, unsigned int flags, mdb_mode_t mode) {
     ASSERT(env_, "MDB_env not created.");
     int status = mdb_env_open(env_, filename, flags, mode);
     ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
   }
+  // Open a table.
   void openDBI(MDB_txn* txn, const char* name, unsigned int flags) {
     ASSERT(env_, "MDB_env not opened.");
     int status = mdb_dbi_open(txn, name, flags, &dbi_);
     ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
   }
+  // Close both the table and the environment.
   void close() {
     if (env_) {
       mdb_dbi_close(env_, dbi_);
@@ -103,15 +107,20 @@ public:
     }
     env_ = NULL;
   }
+  // Set the mapsize.
   void setMapsize(size_t mapsize) {
     int status = mdb_env_set_mapsize(env_, mapsize);
     ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
   }
+  // Get the raw MDB_env pointer.
   MDB_env* getEnv() { return env_; }
+  // Get the raw MDB_dbi pointer.
   MDB_dbi getDBI() { return dbi_; }
 
 private:
+  // MDB_env pointer.
   MDB_env* env_;
+  // MDB_dbi pointer.
   MDB_dbi dbi_;
 };
 
@@ -127,6 +136,7 @@ public:
   Record(const string& data) {
     initialize(data);
   }
+  virtual ~Record() {}
   // Initialize with string.
   void initialize(const string& data) {
     data_.assign(data.begin(), data.end());
@@ -140,9 +150,7 @@ public:
     return reinterpret_cast<const char*>(mdb_val_.mv_data);
   }
   // End of iterator.
-  const char* end() const {
-    return begin() + mdb_val_.mv_size;
-  }
+  const char* end() const { return begin() + mdb_val_.mv_size; }
 
 private:
   // Data buffer.
@@ -178,9 +186,10 @@ namespace {
 MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
                  int nrhs, const mxArray* prhs[]) {
   InputArguments input(nrhs, prhs, 1, 20, "MODE", "FIXEDMAP", "NOSUBDIR",
-    "NOSYNC", "RDONLY", "NOMETASYNC", "WRITEMAP", "MAPASYNC", "NOTLS",
-    "NOLOCK", "NORDAHEAD", "NOMEMINIT", "REVERSEKEY", "DUPSORT", "INTEGERKEY",
-    "DUPFIXED", "INTEGERDUP", "REVERSEDUP", "CREATE", "MAPSIZE");
+      "NOSYNC", "RDONLY", "NOMETASYNC", "WRITEMAP", "MAPASYNC", "NOTLS",
+      "NOLOCK", "NORDAHEAD", "NOMEMINIT", "REVERSEKEY", "DUPSORT",
+      "INTEGERKEY", "DUPFIXED", "INTEGERDUP", "REVERSEDUP", "CREATE",
+      "MAPSIZE");
   OutputArguments output(nlhs, plhs, 1);
   std::unique_ptr<Database> database(new Database);
   ASSERT(database.get() != NULL, "Null pointer exception.");

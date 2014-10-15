@@ -20,6 +20,8 @@ function testLMDB
   foo_count = database.reduce(foo_counter, 0);
   fprintf('Number of ''foo'': %d\n', foo_count);
   clear database;
+  database = lmdb.DB('_testdb', 'RDONLY', true);
+  clear database;
   if exist('_testdb', 'dir')
     rmdir('_testdb', 's');
   end

@@ -160,10 +160,17 @@ private:
 };
 
 // Create a directory.
-void createDirectory(const mxArray* filename) {
-  mxArray* prhs[] = {const_cast<mxArray*>(filename)};
-  ASSERT(mexCallMATLAB(0, NULL, 1, prhs, "mkdir") == 0,
-         "Failed to create a directory.");
+void createDirectoryIfNotExist(const mxArray* filename) {
+  MxArray flag("dir");
+  mxArray* prhs[] = {const_cast<mxArray*>(filename),
+                     const_cast<mxArray*>(flag.get())};
+  mxArray* plhs;
+  ASSERT(mexCallMATLAB(1, &plhs, 2, prhs, "exist") == 0,
+         "Failed to check a directory.");
+  MxArray status(plhs);
+  if (!status.to<bool>())
+    ASSERT(mexCallMATLAB(0, NULL, 1, prhs, "mkdir") == 0,
+           "Failed to create a directory.");
 }
 
 } // namespace
@@ -217,7 +224,7 @@ MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
       ((input.get<bool>("NORDAHEAD", false)) ? MDB_NORDAHEAD : 0) |
       ((input.get<bool>("NOMEMINIT", false)) ? MDB_NOMEMINIT : 0);
   if (!read_only)
-    createDirectory(input.get(0));
+    createDirectoryIfNotExist(input.get(0));
   database->openEnv(filename.c_str(), flags, mode);
   Transaction transaction(database->getEnv(), (read_only) ? MDB_RDONLY : 0);
   flags =

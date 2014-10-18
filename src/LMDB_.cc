@@ -193,7 +193,7 @@ MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
   OutputArguments output(nlhs, plhs, 1);
   std::unique_ptr<Database> database(new Database);
   ASSERT(database.get() != NULL, "Null pointer exception.");
-  database->setMapsize(input.get<int>("MAPSIZE", 10485760));
+  database->setMapsize(input.get<size_t>("MAPSIZE", 10485760));
   string filename(input.get<string>(0));
   mdb_mode_t mode = input.get<int>("MODE", 0664);
   unsigned int flags =

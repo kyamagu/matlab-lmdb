@@ -2,9 +2,6 @@ function testLMDB
 %TESTLMDB Test the functionality of LMDB wrapper.
 
   addpath(fileparts(fileparts(mfilename('fullpath'))));
-  if ~exist('_testdb', 'dir')
-    mkdir('_testdb');
-  end
   % Using a database object.
   database = lmdb.DB('_testdb');
   value = database.get('some-key');

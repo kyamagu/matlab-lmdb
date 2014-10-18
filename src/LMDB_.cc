@@ -159,6 +159,13 @@ private:
   MDB_val mdb_val_;
 };
 
+// Create a directory.
+void createDirectory(const mxArray* filename) {
+  mxArray* prhs[] = {const_cast<mxArray*>(filename)};
+  ASSERT(mexCallMATLAB(0, NULL, 1, prhs, "mkdir") == 0,
+         "Failed to create a directory.");
+}
+
 } // namespace
 
 namespace mexplus {
@@ -194,13 +201,14 @@ MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
   std::unique_ptr<Database> database(new Database);
   ASSERT(database.get() != NULL, "Null pointer exception.");
   database->setMapsize(input.get<size_t>("MAPSIZE", 10485760));
+  bool read_only = input.get<bool>("RDONLY", false);
   string filename(input.get<string>(0));
-  mdb_mode_t mode = input.get<int>("MODE", 0664);
+  mdb_mode_t mode = input.get<mdb_mode_t>("MODE", 0664);
   unsigned int flags =
+      ((read_only) ? MDB_RDONLY : 0) |
       ((input.get<bool>("FIXEDMAP", false)) ? MDB_FIXEDMAP : 0) |
       ((input.get<bool>("NOSUBDIR", false)) ? MDB_NOSUBDIR : 0) |
       ((input.get<bool>("NOSYNC", false)) ? MDB_NOSYNC : 0) |
-      ((input.get<bool>("RDONLY", false)) ? MDB_RDONLY : 0) |
       ((input.get<bool>("NOMETASYNC", false)) ? MDB_NOMETASYNC : 0) |
       ((input.get<bool>("WRITEMAP", false)) ? MDB_WRITEMAP : 0) |
       ((input.get<bool>("MAPASYNC", false)) ? MDB_MAPASYNC : 0) |
@@ -208,9 +216,10 @@ MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
       ((input.get<bool>("NOLOCK", false)) ? MDB_NOLOCK : 0) |
       ((input.get<bool>("NORDAHEAD", false)) ? MDB_NORDAHEAD : 0) |
       ((input.get<bool>("NOMEMINIT", false)) ? MDB_NOMEMINIT : 0);
+  if (!read_only)
+    createDirectory(input.get(0));
   database->openEnv(filename.c_str(), flags, mode);
-  flags = ((input.get<bool>("RDONLY", false)) ? MDB_RDONLY : 0);
-  Transaction transaction(database->getEnv(), flags);
+  Transaction transaction(database->getEnv(), (read_only) ? MDB_RDONLY : 0);
   flags =
       ((input.get<bool>("REVERSEKEY", false)) ? MDB_REVERSEKEY : 0) |
       ((input.get<bool>("DUPSORT", false)) ? MDB_DUPSORT : 0) |
@@ -218,7 +227,7 @@ MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
       ((input.get<bool>("DUPFIXED", false)) ? MDB_DUPFIXED : 0) |
       ((input.get<bool>("INTEGERDUP", false)) ? MDB_INTEGERDUP : 0) |
       ((input.get<bool>("REVERSEDUP", false)) ? MDB_REVERSEDUP : 0) |
-      ((input.get<bool>("CREATE", flags == 0)) ? MDB_CREATE : 0);
+      ((input.get<bool>("CREATE", !read_only)) ? MDB_CREATE : 0);
   database->openDBI(transaction.get(), NULL, flags);
   transaction.commit();
   output.set(0, Session<Database>::create(database.release()));

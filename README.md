@@ -21,10 +21,9 @@ Example
 -------
 
     % Open and close.
-    database = lmdb.DB('./db');
+    database = lmdb.DB('./db', 'MAPSIZE', 1024^3);
     clear database;
-    readonly_database = lmdb.DB('./db', 'RDONLY', true, ...
-                                        'MAPSIZE', 1024^3);
+    readonly_database = lmdb.DB('./db', 'RDONLY', true);
     clear readonly_database;
 
     % Read and write.

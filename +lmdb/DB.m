@@ -107,6 +107,27 @@ methods
     assert(abs(nargin(func)) > 2 && abs(nargout(func)) > 0);
     result = LMDB_('reduce', this.id_, func, initial_value);
   end
+
+  function transaction = begin(this, varargin)
+  %TRANSACTION Create a new transaction.
+  %
+  % transaction = database.begin()
+  % try
+  %   transaction.put(key, value)
+  %   transaction.commit()
+  % catch exception
+  %   transaction.abort()
+  % end
+  %
+  % Options
+  %   'RDONLY', default false
+  %
+  % Note: Calling a database method when there is an active transaction results
+  % in deadlock. Also, destroying a database while there is an active
+  % transaction will crash the process.
+    assert(isscalar(this));
+    transaction = lmdb.Transaction(this.id_, varargin{:});
+  end
 end
 
 end

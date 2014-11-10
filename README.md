@@ -36,6 +36,16 @@ Example
     database.each(@(key, value) disp([key, ': ', value]));
     count = database.reduce(@(key, value, count) count + 1, 0);
 
+    % Transaction.
+    transaction = database.begin();
+    try
+      transaction.put('key1', 'value1');
+      transaction.put('key2', 'value2');
+      transaction.commit();
+    catch exception
+      transaction.abort();
+    end
+
 TODO
 ----
 

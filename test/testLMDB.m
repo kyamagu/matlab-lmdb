@@ -3,9 +3,14 @@ function testLMDB
 
   addpath(fileparts(fileparts(mfilename('fullpath'))));
   % Using a database object.
-  %test_readonly;
-  %test_operations;
-  test_transaction;
+  try
+    test_readonly;
+    test_operations;
+    test_transaction;
+    test_datatype;
+  catch exception
+    disp(exception.getReport());
+  end
   if exist('_testdb', 'dir')
     rmdir('_testdb', 's');
   end
@@ -44,19 +49,33 @@ end
 
 function test_transaction
   database = lmdb.DB('_testdb');
+  % Abort test.
   transaction = database.begin();
-  transaction.put('1', 'foo');
-  transaction.put('2', 'bar');
-  transaction.put('3', 'baz');
+  for i = 1:1000
+    transaction.put(num2str(i), 'foo');
+  end
   transaction.abort();
   clear transaction;
   assert(isempty(database.get('1')));
+  % Commit test.
   transaction = database.begin();
-  transaction.put('1', 'foo');
-  transaction.put('2', 'bar');
-  transaction.put('3', 'baz');
+  for i = 1:1000
+    transaction.put(num2str(i), 'foo');
+  end
   transaction.commit();
   assert(strcmp(database.get('1'), 'foo'));
   clear transaction;
+  % No transaction.
+  database.remove('1');
+  assert(isempty(database.get('1')));
   clear database; % Make sure database is not destroyed before transaction.
+end
+
+function test_datatype
+  database = lmdb.DB('_testdb');
+  value = uint8(0:255);
+  database.put('1', value);
+  value2 = cast(database.get('1'), 'uint8');
+  assert(all(value == value2));
+  clear database;
 end

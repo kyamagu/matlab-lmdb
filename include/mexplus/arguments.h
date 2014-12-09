@@ -81,6 +81,7 @@ public:
                                           CaseInsensitiveElementComparator());
     }
   };
+
   typedef std::map<std::string, const mxArray*, CaseInsensitiveComparator>
       OptionMap;
   /** Definition of arguments.

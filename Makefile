@@ -7,7 +7,7 @@ MATLABDIR ?= /usr/local/matlab
 MATLAB := $(MATLABDIR)/bin/matlab
 MEX := $(MATLABDIR)/bin/mex
 MEXEXT := $(shell $(MATLABDIR)/bin/mexext)
-MEXFLAGS := -Iinclude -I$(LMDB_DIR)
+MEXFLAGS := -Iinclude -I$(LMDB_DIR) CXXFLAGS="\$$CXXFLAGS -std=c++11"
 TARGET := +lmdb/private/LMDB_.$(MEXEXT)
 
 .PHONY: all test clean

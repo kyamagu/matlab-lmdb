@@ -23,7 +23,7 @@ Example
     % Open and close.
     database = lmdb.DB('./db', 'MAPSIZE', 1024^3);
     clear database;
-    readonly_database = lmdb.DB('./db', 'RDONLY', true);
+    readonly_database = lmdb.DB('./db', 'RDONLY', true, 'NOLOCK', true);
     clear readonly_database;
 
     % Read and write.

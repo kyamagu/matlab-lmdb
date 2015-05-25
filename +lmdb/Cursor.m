@@ -1,18 +1,14 @@
 classdef Cursor < handle
 %CURSOR LMDB cursor wrapper.
 %
-% Usage:
-%
-% transaction = database.begin('RDONLY', true);
-% cursor = transaction.cursor();
+% cursor = database.cursor('RDONLY', true);
 % while cursor.next()
 %   key = cursor.key;
 %   value = cursor.value;
 % end
 % clear cursor;
-% transaction.commit();
 %
-% See also lmdb
+% See also lmdb.DB.cursor
 
 properties (Access = private)
   id_ % ID of the session.
@@ -26,13 +22,13 @@ properties (Dependent)
 end
 
 methods (Hidden)
-  function this = Cursor(transaction_id, database_id, varargin)
+  function this = Cursor(database_id, varargin)
   %CURSOR Create a new cursor.
     assert(isscalar(this));
     assert(isscalar(database_id));
-    this.id_ = LMDB_('cursor_new', transaction_id, database_id, varargin{:});
-    this.transaction_id_ = transaction_id;
     this.database_id_ = database_id;
+    this.transaction_id_ = LMDB_('txn_new', database_id, varargin{:});
+    this.id_ = LMDB_('cursor_new', this.transaction_id_, database_id);
   end
 end
 
@@ -41,6 +37,8 @@ methods
   %DELETE Destructor.
     assert(isscalar(this));
     LMDB_('cursor_delete', this.id_);
+    LMDB_('txn_commit', this.transaction_id_);
+    LMDB_('txn_delete', this.transaction_id_);
   end
 
   function flag = next(this)

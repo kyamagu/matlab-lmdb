@@ -81,16 +81,14 @@ function test_cursor
   database.put('some-key', 'foo');
   database.put('another-key', 'bar');
   database.put('yet-another-key', 'baz');
-  transaction = database.begin('RDONLY', true);
-  cursor = transaction.cursor();
+  cursor = database.cursor();
   while cursor.next()
     disp([cursor.key, ': ', cursor.value]);
   end
   while cursor.previous()
     disp([cursor.key, ': ', cursor.value]);
   end
-  transaction.commit();
-  clear transaction;
+  clear cursor;
   [key, value] = database.first();
   disp([key, ': ', value]);
   clear database;

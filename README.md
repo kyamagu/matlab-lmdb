@@ -38,6 +38,14 @@ Example
     database.each(@(key, value) disp([key, ': ', value]));
     count = database.reduce(@(key, value, count) count + 1, 0);
 
+    % Cursor.
+    cursor = database.cursor('RDONLY', true);
+    while cursor.next()
+      key = cursor.key;
+      value = cursor.value;
+    end
+    clear cursor;
+
     % Transaction.
     transaction = database.begin();
     try
@@ -47,6 +55,7 @@ Example
     catch exception
       transaction.abort();
     end
+    clear transaction;
 
 TODO
 ----

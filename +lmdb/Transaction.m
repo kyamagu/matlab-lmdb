@@ -9,7 +9,7 @@ classdef Transaction < handle
 %   transaction.abort()
 % end
 %
-% See also lmdb
+% See also lmdb.DB.begin
 
 properties (Access = private)
   id_ % ID of the session.
@@ -69,12 +69,6 @@ methods
   %REMOVE Remove a record.
     assert(isscalar(this));
     LMDB_('txn_remove', this.id_, this.database_id_, key, varargin{:});
-  end
-
-  function cursor_value = cursor(this, varargin)
-  %REMOVE Remove a record.
-    assert(isscalar(this));
-    cursor_value = lmdb.Cursor(this.id_, this.database_id_, varargin{:});
   end
 end
 

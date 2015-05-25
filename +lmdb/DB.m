@@ -15,7 +15,15 @@ classdef DB < handle
 % database.each(@(key, value) disp([key, ':', 'value']));
 % count = database.reduce(@(key, value, count) count + 1, 0);
 %
-% See also lmdb
+% % Cursor.
+% cursor = database.cursor('RDONLY', true);
+% while cursor.next()
+%   key = cursor.key;
+%   value = cursor.value;
+% end
+% clear cursor;
+%
+% See also lmdb.DB.DB
 
 properties (Access = private)
   id_ % ID of the session.
@@ -38,7 +46,7 @@ methods
   %   'WRITEMAP'  default false
   %   'MAPASYNC' default false
   %   'NOTLS' default false
-  %   'NOLOCK', default false
+  %   'NOLOCK' default false
   %   'NORDAHEAD' default false
   %   'NOMEMINIT' default false
   %   'REVERSEKEY'  default false
@@ -120,7 +128,7 @@ methods
   % end
   %
   % Options
-  %   'RDONLY', default false
+  %   'RDONLY' default false
   %
   % Note: Calling a database method when there is an active transaction results
   % in deadlock. Also, destroying a database while there is an active
@@ -129,15 +137,20 @@ methods
     transaction = lmdb.Transaction(this.id_, varargin{:});
   end
 
+  function cursor_value = cursor(this, varargin)
+  %CURSOR Create a new cursor.
+  %
+  % See also lmdb.Cursor
+    assert(isscalar(this));
+    cursor_value = lmdb.Cursor(this.id_, varargin{:});
+  end
+
   function [key, value] = first(this)
   %FIRST Get the first key-value pair.
   %
   % [key, value] = database.first()
-  %
-  % See also lmdb.Cursor
     assert(isscalar(this));
-    transaction = this.begin('RDONLY', true);
-    cursor = transaction.cursor();
+    cursor = this.cursor('RDONLY', true);
     if cursor.next()
       key = cursor.key;
       if nargout > 1
@@ -148,7 +161,6 @@ methods
       value = [];
     end
     clear cursor;
-    clear transaction;
   end
 end
 

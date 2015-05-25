@@ -128,6 +128,28 @@ methods
     assert(isscalar(this));
     transaction = lmdb.Transaction(this.id_, varargin{:});
   end
+
+  function [key, value] = first(this)
+  %FIRST Get the first key-value pair.
+  %
+  % [key, value] = database.first()
+  %
+  % See also lmdb.Cursor
+    assert(isscalar(this));
+    transaction = this.begin('RDONLY', true);
+    cursor = transaction.cursor();
+    if cursor.next()
+      key = cursor.key;
+      if nargout > 1
+        value = cursor.value;
+      end
+    else
+      key = [];
+      value = [];
+    end
+    clear cursor;
+    clear transaction;
+  end
 end
 
 end

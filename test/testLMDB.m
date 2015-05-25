@@ -6,6 +6,7 @@ function testLMDB
   try
     test_readonly;
     test_operations;
+    test_cursor;
     test_transaction;
     test_datatype;
   catch exception
@@ -19,6 +20,7 @@ function testLMDB
 end
 
 function test_operations
+  disp('Testing operations');
   database = lmdb.DB('_testdb');
   value = database.get('some-key');
   assert(isempty(value));
@@ -35,6 +37,7 @@ function test_operations
 end
 
 function test_readonly
+  disp('Testing read-only');
   database = lmdb.DB('_testdb');
   clear database;
   database = lmdb.DB('_testdb', 'RDONLY', true);
@@ -48,6 +51,7 @@ function test_readonly
 end
 
 function test_transaction
+  disp('Testing transaction');
   database = lmdb.DB('_testdb');
   % Abort test.
   transaction = database.begin();
@@ -71,7 +75,29 @@ function test_transaction
   clear database; % Make sure database is not destroyed before transaction.
 end
 
+function test_cursor
+  disp('Testing cursor');
+  database = lmdb.DB('_testdb');
+  database.put('some-key', 'foo');
+  database.put('another-key', 'bar');
+  database.put('yet-another-key', 'baz');
+  transaction = database.begin('RDONLY', true);
+  cursor = transaction.cursor();
+  while cursor.next()
+    disp([cursor.key, ': ', cursor.value]);
+  end
+  while cursor.previous()
+    disp([cursor.key, ': ', cursor.value]);
+  end
+  transaction.commit();
+  clear transaction;
+  [key, value] = database.first();
+  disp([key, ': ', value]);
+  clear database;
+end
+
 function test_datatype
+  disp('Testing data type');
   database = lmdb.DB('_testdb');
   value = uint8(0:255);
   database.put('1', value);

@@ -70,6 +70,12 @@ methods
     assert(isscalar(this));
     LMDB_('txn_remove', this.id_, this.database_id_, key, varargin{:});
   end
+
+  function cursor_value = cursor(this, varargin)
+  %REMOVE Remove a record.
+    assert(isscalar(this));
+    cursor_value = lmdb.Cursor(this.id_, this.database_id_, varargin{:});
+  end
 end
 
 end

@@ -54,31 +54,6 @@ private:
   MDB_txn* txn_;
 };
 
-// Cursor container.
-class Cursor {
-public:
-  Cursor() : cursor_(NULL) {}
-  virtual ~Cursor() { close(); }
-  // Open the cursor.
-  void open(MDB_txn *txn, MDB_dbi dbi) {
-    close();
-    int status = mdb_cursor_open(txn, dbi, &cursor_);
-    ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
-  }
-  // Close the cursor.
-  void close() {
-    if (cursor_)
-      mdb_cursor_close(cursor_);
-    cursor_ = NULL;
-  }
-  // Get the raw cursor.
-  MDB_cursor* get() { return cursor_; }
-
-private:
-  // MDB_cursor pointer.
-  MDB_cursor* cursor_;
-};
-
 // Database manager.
 class Database {
 public:
@@ -160,6 +135,39 @@ private:
   MDB_val mdb_val_;
 };
 
+// Cursor container.
+class Cursor {
+public:
+  Cursor() : cursor_(NULL) {}
+  virtual ~Cursor() { close(); }
+  // Open the cursor.
+  void open(MDB_txn *txn, MDB_dbi dbi) {
+    close();
+    int status = mdb_cursor_open(txn, dbi, &cursor_);
+    ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
+  }
+  // Close the cursor.
+  void close() {
+    if (cursor_)
+      mdb_cursor_close(cursor_);
+    cursor_ = NULL;
+  }
+  // Get the raw cursor.
+  MDB_cursor* get() { return cursor_; }
+  // Get the raw record.
+  Record* getKey() { return &key_; }
+  // Get the raw record.
+  Record* getValue() { return &value_; }
+
+private:
+  // MDB_cursor pointer.
+  MDB_cursor* cursor_;
+  // Key.
+  Record key_;
+  // Value.
+  Record value_;
+};
+
 // Create a directory.
 void createDirectoryIfNotExist(const mxArray* filename) {
   MxArray flag("dir");
@@ -194,6 +202,7 @@ mxArray* MxArray::from(const Record& value) {
 // Session instance storage.
 template class Session<Database>;
 template class Session<Transaction>;
+template class Session<Cursor>;
 
 } // namespace mexplus
 
@@ -309,19 +318,24 @@ MEX_DEFINE(each) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 2);
   OutputArguments output(nlhs, plhs, 0);
   Database* database = Session<Database>::get(input.get(0));
-  Cursor cursor;
-  Record key, value;
   Transaction transaction(database->getEnv(), NULL, MDB_RDONLY);
+  Cursor cursor;
   cursor.open(transaction.get(), database->getDBI());
-  int status = mdb_cursor_get(cursor.get(), key.get(), value.get(), MDB_NEXT);
+  int status = mdb_cursor_get(cursor.get(),
+                              cursor.getKey()->get(),
+                              cursor.getValue()->get(),
+                              MDB_NEXT);
   while (status == MDB_SUCCESS) {
-    MxArray key_array(key);
-    MxArray value_array(value);
+    MxArray key_array(*cursor.getKey());
+    MxArray value_array(*cursor.getValue());
     mxArray* prhs[] = {const_cast<mxArray*>(input.get(1)),
                        const_cast<mxArray*>(key_array.get()),
                        const_cast<mxArray*>(value_array.get())};
     ASSERT(mexCallMATLAB(0, NULL, 3, prhs, "feval") == 0, "Callback failure.");
-    status = mdb_cursor_get(cursor.get(), key.get(), value.get(), MDB_NEXT);
+    status = mdb_cursor_get(cursor.get(),
+                            cursor.getKey()->get(),
+                            cursor.getValue()->get(),
+                            MDB_NEXT);
   }
   ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
          mdb_strerror(status));
@@ -335,14 +349,16 @@ MEX_DEFINE(reduce) (int nlhs, mxArray* plhs[],
   OutputArguments output(nlhs, plhs, 1);
   Database* database = Session<Database>::get(input.get(0));
   Cursor cursor;
-  Record key, value;
   MxArray accumulation(input.get(2));
   Transaction transaction(database->getEnv(), NULL, MDB_RDONLY);
   cursor.open(transaction.get(), database->getDBI());
-  int status = mdb_cursor_get(cursor.get(), key.get(), value.get(), MDB_NEXT);
+  int status = mdb_cursor_get(cursor.get(),
+                              cursor.getKey()->get(),
+                              cursor.getValue()->get(),
+                              MDB_NEXT);
   while (status == MDB_SUCCESS) {
-    MxArray key_array(key);
-    MxArray value_array(value);
+    MxArray key_array(*cursor.getKey());
+    MxArray value_array(*cursor.getValue());
     mxArray* lhs = NULL;
     mxArray* prhs[] = {const_cast<mxArray*>(input.get(1)),
                        const_cast<mxArray*>(key_array.get()),
@@ -350,7 +366,10 @@ MEX_DEFINE(reduce) (int nlhs, mxArray* plhs[],
                        const_cast<mxArray*>(accumulation.get())};
     ASSERT(mexCallMATLAB(1, &lhs, 4, prhs, "feval") == 0, "Callback failure.");
     accumulation.reset(lhs);
-    status = mdb_cursor_get(cursor.get(), key.get(), value.get(), MDB_NEXT);
+    status = mdb_cursor_get(cursor.get(),
+                            cursor.getKey()->get(),
+                            cursor.getValue()->get(),
+                            MDB_NEXT);
   }
   ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
          mdb_strerror(status));
@@ -443,6 +462,68 @@ MEX_DEFINE(txn_remove) (int nlhs, mxArray* plhs[],
                        key.get(),
                        NULL);
   ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
+}
+
+MEX_DEFINE(cursor_new) (int nlhs, mxArray* plhs[],
+                        int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 2);
+  OutputArguments output(nlhs, plhs, 1);
+  Transaction* transaction = Session<Transaction>::get(input.get(0));
+  Database* database = Session<Database>::get(input.get(1));
+  std::unique_ptr<Cursor> cursor(new Cursor);
+  cursor->open(transaction->get(), database->getDBI());
+  output.set(0, Session<Cursor>::create(cursor.release()));
+}
+
+MEX_DEFINE(cursor_delete) (int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 0);
+  Session<Cursor>::destroy(input.get(0));
+}
+
+MEX_DEFINE(cursor_next) (int nlhs, mxArray* plhs[],
+                         int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  int status = mdb_cursor_get(cursor->get(),
+                              cursor->getKey()->get(),
+                              cursor->getValue()->get(),
+                              MDB_NEXT);
+  ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
+         mdb_strerror(status));
+  output.set(0, status == MDB_SUCCESS);
+}
+
+MEX_DEFINE(cursor_previous) (int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  int status = mdb_cursor_get(cursor->get(),
+                              cursor->getKey()->get(),
+                              cursor->getValue()->get(),
+                              MDB_PREV);
+  ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
+         mdb_strerror(status));
+  output.set(0, status == MDB_SUCCESS);
+}
+
+MEX_DEFINE(cursor_getkey) (int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  output.set(0, *cursor->getKey());
+}
+
+MEX_DEFINE(cursor_getvalue) (int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  output.set(0, *cursor->getValue());
 }
 
 } // namespace

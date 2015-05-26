@@ -83,9 +83,19 @@ public:
     }
     env_ = NULL;
   }
-  // Set the mapsize.
+  // Set the size of the memory map to use for this environment.
   void setMapsize(size_t mapsize) {
     int status = mdb_env_set_mapsize(env_, mapsize);
+    ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
+  }
+  // Set the maximum number of threads/reader slots for the environment.
+  void setMaxReaders(unsigned int readers) {
+    int status = mdb_env_set_maxreaders(env_, readers);
+    ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
+  }
+  // Set the maximum number of named databases for the environment.
+  void setMaxDBS(MDB_dbi dbs) {
+    int status = mdb_env_set_maxdbs(env_, dbs);
     ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
   }
   // Get the raw MDB_env pointer.
@@ -210,15 +220,17 @@ namespace {
 
 MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
                  int nrhs, const mxArray* prhs[]) {
-  InputArguments input(nrhs, prhs, 1, 20, "MODE", "FIXEDMAP", "NOSUBDIR",
+  InputArguments input(nrhs, prhs, 1, 23, "MODE", "FIXEDMAP", "NOSUBDIR",
       "NOSYNC", "RDONLY", "NOMETASYNC", "WRITEMAP", "MAPASYNC", "NOTLS",
       "NOLOCK", "NORDAHEAD", "NOMEMINIT", "REVERSEKEY", "DUPSORT",
       "INTEGERKEY", "DUPFIXED", "INTEGERDUP", "REVERSEDUP", "CREATE",
-      "MAPSIZE");
+      "MAPSIZE", "MAXREADERS", "MAXDBS", "NAME");
   OutputArguments output(nlhs, plhs, 1);
   std::unique_ptr<Database> database(new Database);
   ASSERT(database.get() != NULL, "Null pointer exception.");
   database->setMapsize(input.get<size_t>("MAPSIZE", 10485760));
+  database->setMaxReaders(input.get<unsigned int>("MAXREADERS", 126));
+  database->setMaxDBS(input.get<MDB_dbi>("MAXDBS", 0));
   bool read_only = input.get<bool>("RDONLY", false);
   string filename(input.get<string>(0));
   mdb_mode_t mode = input.get<mdb_mode_t>("MODE", 0664);
@@ -248,7 +260,10 @@ MEX_DEFINE(new) (int nlhs, mxArray* plhs[],
       ((input.get<bool>("INTEGERDUP", false)) ? MDB_INTEGERDUP : 0) |
       ((input.get<bool>("REVERSEDUP", false)) ? MDB_REVERSEDUP : 0) |
       ((input.get<bool>("CREATE", !read_only)) ? MDB_CREATE : 0);
-  database->openDBI(transaction.get(), NULL, flags);
+  string name = input.get<string>("NAME", "");
+  database->openDBI(transaction.get(),
+                    (name == "") ? NULL : name.c_str(),
+                    flags);
   transaction.commit();
   output.set(0, Session<Database>::create(database.release()));
 }

@@ -57,6 +57,9 @@ methods
   %   'REVERSEDUP'  default false
   %   'CREATE'  default true unless 'RDONLY' specified
   %   'MAPSIZE' default 10485760
+  %   'MAXREADERS' default 126
+  %   'MAXDBS' default 0
+  %   'NAME' default ''
     assert(isscalar(this));
     assert(ischar(filename));
     this.id_ = LMDB_('new', filename, varargin{:});

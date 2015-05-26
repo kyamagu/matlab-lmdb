@@ -13,7 +13,6 @@ classdef Transaction < handle
 
 properties (Access = private)
   id_ % ID of the session.
-  database_id_ % ID of the database session.
 end
 
 methods (Hidden)
@@ -24,7 +23,6 @@ methods (Hidden)
     assert(isscalar(this));
     assert(isscalar(database_id));
     this.id_ = LMDB_('txn_new', database_id, varargin{:});
-    this.database_id_ = database_id;
   end
 end
 
@@ -50,7 +48,7 @@ methods
   function result = get(this, key)
   %GET Query a record.
     assert(isscalar(this));
-    result = LMDB_('txn_get', this.id_, this.database_id_, key);
+    result = LMDB_('txn_get', this.id_, key);
   end
 
   function put(this, key, value, varargin)
@@ -62,13 +60,13 @@ methods
   %   'RESERVE' default false
   %   'APPEND' default false
     assert(isscalar(this));
-    LMDB_('txn_put', this.id_, this.database_id_, key, value, varargin{:});
+    LMDB_('txn_put', this.id_, key, value, varargin{:});
   end
 
   function remove(this, key, varargin)
   %REMOVE Remove a record.
     assert(isscalar(this));
-    LMDB_('txn_remove', this.id_, this.database_id_, key, varargin{:});
+    LMDB_('txn_remove', this.id_, key, varargin{:});
   end
 end
 

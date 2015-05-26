@@ -359,24 +359,14 @@ MEX_DEFINE(each) (int nlhs, mxArray* plhs[],
   Transaction transaction(database->getEnv(), NULL, MDB_RDONLY);
   Cursor cursor;
   cursor.open(transaction.get(), database->getDBI());
-  int status = mdb_cursor_get(cursor.get(),
-                              cursor.getKey()->get(),
-                              cursor.getValue()->get(),
-                              MDB_NEXT);
-  while (status == MDB_SUCCESS) {
+  while (cursor.get(MDB_NEXT)) {
     MxArray key_array(*cursor.getKey());
     MxArray value_array(*cursor.getValue());
     mxArray* prhs[] = {const_cast<mxArray*>(input.get(1)),
                        const_cast<mxArray*>(key_array.get()),
                        const_cast<mxArray*>(value_array.get())};
     ASSERT(mexCallMATLAB(0, NULL, 3, prhs, "feval") == 0, "Callback failure.");
-    status = mdb_cursor_get(cursor.get(),
-                            cursor.getKey()->get(),
-                            cursor.getValue()->get(),
-                            MDB_NEXT);
   }
-  ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
-         mdb_strerror(status));
   cursor.close();
   transaction.commit();
 }
@@ -386,15 +376,11 @@ MEX_DEFINE(reduce) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 3);
   OutputArguments output(nlhs, plhs, 1);
   Database* database = Session<Database>::get(input.get(0));
-  Cursor cursor;
   MxArray accumulation(input.get(2));
   Transaction transaction(database->getEnv(), NULL, MDB_RDONLY);
+  Cursor cursor;
   cursor.open(transaction.get(), database->getDBI());
-  int status = mdb_cursor_get(cursor.get(),
-                              cursor.getKey()->get(),
-                              cursor.getValue()->get(),
-                              MDB_NEXT);
-  while (status == MDB_SUCCESS) {
+  while (cursor.get(MDB_NEXT)) {
     MxArray key_array(*cursor.getKey());
     MxArray value_array(*cursor.getValue());
     mxArray* lhs = NULL;
@@ -404,13 +390,7 @@ MEX_DEFINE(reduce) (int nlhs, mxArray* plhs[],
                        const_cast<mxArray*>(accumulation.get())};
     ASSERT(mexCallMATLAB(1, &lhs, 4, prhs, "feval") == 0, "Callback failure.");
     accumulation.reset(lhs);
-    status = mdb_cursor_get(cursor.get(),
-                            cursor.getKey()->get(),
-                            cursor.getValue()->get(),
-                            MDB_NEXT);
   }
-  ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
-         mdb_strerror(status));
   cursor.close();
   transaction.commit();
   output.set(0, accumulation.release());

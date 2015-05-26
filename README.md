@@ -8,7 +8,7 @@ Matlab LMDB wrapper for UNIX environment.
 
 See also [matlab-leveldb](http://github.com/kyamagu/matlab-leveldb).
 
-Those using [Caffe](https://github.com/BVLC/caffe) might want to use a [Datum converter](https://gist.github.com/kyamagu/31a4b6f782670a28098b) also.
+The package does not contain any data serialization. Use `char` for storing keys and values. Those using [Caffe](https://github.com/BVLC/caffe) might want to use a [Datum converter](https://gist.github.com/kyamagu/31a4b6f782670a28098b) also.
 
 Build
 -----

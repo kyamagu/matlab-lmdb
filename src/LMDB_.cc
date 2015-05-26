@@ -129,6 +129,12 @@ public:
     mdb_val_.mv_size = data_.size();
     mdb_val_.mv_data = const_cast<char*>(data_.c_str());
   }
+  // Sync the buffer.
+  void sync() {
+    data_.assign(begin(), end());
+    mdb_val_.mv_size = data_.size();
+    mdb_val_.mv_data = const_cast<char*>(data_.c_str());
+  }
   // Get MDB_val pointer.
   MDB_val* get() { return &mdb_val_; }
   // Beginning of iterator.
@@ -161,6 +167,23 @@ public:
     if (cursor_)
       mdb_cursor_close(cursor_);
     cursor_ = NULL;
+  }
+  // Apply the cursor operation and get the value.
+  bool get(MDB_cursor_op operation) {
+    int status = mdb_cursor_get(cursor_, key_.get(), value_.get(), operation);
+    ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
+           mdb_strerror(status));
+    return status == MDB_SUCCESS;
+  }
+  // Put the current key and value.
+  void put(unsigned int flags) {
+    int status = mdb_cursor_put(cursor_, key_.get(), value_.get(), flags);
+    ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
+  }
+  // Delete the current key and value.
+  void remove(unsigned int flags) {
+    int status = mdb_cursor_del(cursor_, flags);
+    ASSERT(status == MDB_SUCCESS, mdb_strerror(status));
   }
   // Get the raw cursor.
   MDB_cursor* get() { return cursor_; }
@@ -502,13 +525,7 @@ MEX_DEFINE(cursor_next) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 1);
   OutputArguments output(nlhs, plhs, 1);
   Cursor* cursor = Session<Cursor>::get(input.get(0));
-  int status = mdb_cursor_get(cursor->get(),
-                              cursor->getKey()->get(),
-                              cursor->getValue()->get(),
-                              MDB_NEXT);
-  ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
-         mdb_strerror(status));
-  output.set(0, status == MDB_SUCCESS);
+  output.set(0, cursor->get(MDB_NEXT));
 }
 
 MEX_DEFINE(cursor_previous) (int nlhs, mxArray* plhs[],
@@ -516,13 +533,32 @@ MEX_DEFINE(cursor_previous) (int nlhs, mxArray* plhs[],
   InputArguments input(nrhs, prhs, 1);
   OutputArguments output(nlhs, plhs, 1);
   Cursor* cursor = Session<Cursor>::get(input.get(0));
-  int status = mdb_cursor_get(cursor->get(),
-                              cursor->getKey()->get(),
-                              cursor->getValue()->get(),
-                              MDB_PREV);
-  ASSERT(status == MDB_SUCCESS || status == MDB_NOTFOUND,
-         mdb_strerror(status));
-  output.set(0, status == MDB_SUCCESS);
+  output.set(0, cursor->get(MDB_PREV));
+}
+
+MEX_DEFINE(cursor_first) (int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  output.set(0, cursor->get(MDB_FIRST));
+}
+
+MEX_DEFINE(cursor_last) (int nlhs, mxArray* plhs[],
+                         int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  output.set(0, cursor->get(MDB_LAST));
+}
+
+MEX_DEFINE(cursor_find) (int nlhs, mxArray* plhs[],
+                         int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 2);
+  OutputArguments output(nlhs, plhs, 1);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  input.get<Record>(1, cursor->getKey());
+  output.set(0, cursor->get(MDB_SET));
 }
 
 MEX_DEFINE(cursor_getkey) (int nlhs, mxArray* plhs[],
@@ -533,12 +569,60 @@ MEX_DEFINE(cursor_getkey) (int nlhs, mxArray* plhs[],
   output.set(0, *cursor->getKey());
 }
 
+MEX_DEFINE(cursor_setkey) (int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 2, 7, "CURRENT", "NODUPDATA", "NOOVERWRITE",
+      "RESERVE", "APPEND", "APPENDDUP", "MULTIPLE");
+  OutputArguments output(nlhs, plhs, 0);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  input.get<Record>(1, cursor->getKey());
+  cursor->getValue()->sync();
+  unsigned int flags =
+      ((input.get<bool>("CURRENT", true)) ? MDB_CURRENT : 0) |
+      ((input.get<bool>("NODUPDATA", false)) ? MDB_NODUPDATA : 0) |
+      ((input.get<bool>("NOOVERWRITE", false)) ? MDB_NOOVERWRITE : 0) |
+      ((input.get<bool>("RESERVE", false)) ? MDB_RESERVE : 0) |
+      ((input.get<bool>("APPEND", false)) ? MDB_APPEND : 0) |
+      ((input.get<bool>("APPENDDUP", false)) ? MDB_APPENDDUP : 0) |
+      ((input.get<bool>("MULTIPLE", false)) ? MDB_MULTIPLE : 0);
+  cursor->put(flags);
+}
+
 MEX_DEFINE(cursor_getvalue) (int nlhs, mxArray* plhs[],
                              int nrhs, const mxArray* prhs[]) {
   InputArguments input(nrhs, prhs, 1);
   OutputArguments output(nlhs, plhs, 1);
   Cursor* cursor = Session<Cursor>::get(input.get(0));
   output.set(0, *cursor->getValue());
+}
+
+MEX_DEFINE(cursor_setvalue) (int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 2, 7, "CURRENT", "NODUPDATA", "NOOVERWRITE",
+      "RESERVE", "APPEND", "APPENDDUP", "MULTIPLE");
+  OutputArguments output(nlhs, plhs, 0);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  input.get<Record>(1, cursor->getValue());
+  cursor->getKey()->sync();
+  unsigned int flags =
+      ((input.get<bool>("CURRENT", true)) ? MDB_CURRENT : 0) |
+      ((input.get<bool>("NODUPDATA", false)) ? MDB_NODUPDATA : 0) |
+      ((input.get<bool>("NOOVERWRITE", false)) ? MDB_NOOVERWRITE : 0) |
+      ((input.get<bool>("RESERVE", false)) ? MDB_RESERVE : 0) |
+      ((input.get<bool>("APPEND", false)) ? MDB_APPEND : 0) |
+      ((input.get<bool>("APPENDDUP", false)) ? MDB_APPENDDUP : 0) |
+      ((input.get<bool>("MULTIPLE", false)) ? MDB_MULTIPLE : 0);
+  cursor->put(flags);
+}
+
+MEX_DEFINE(cursor_remove) (int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 0);
+  Cursor* cursor = Session<Cursor>::get(input.get(0));
+  unsigned int flags =
+      (input.get<bool>("NODUPDATA", false)) ? MDB_NODUPDATA : 0;
+  cursor->remove(flags);
 }
 
 } // namespace

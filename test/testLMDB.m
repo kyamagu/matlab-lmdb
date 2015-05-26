@@ -82,12 +82,21 @@ function test_cursor
   database.put('another-key', 'bar');
   database.put('yet-another-key', 'baz');
   cursor = database.cursor();
+  i = 1;
+  while cursor.next()
+    disp([cursor.key, ': ', cursor.value]);
+    cursor.value = num2str(i);
+    i = i + 1;
+  end
+  clear cursor;
+  cursor = database.cursor('RDONLY', true);
   while cursor.next()
     disp([cursor.key, ': ', cursor.value]);
   end
-  while cursor.previous()
-    disp([cursor.key, ': ', cursor.value]);
-  end
+  assert(cursor.first());
+  assert(cursor.last());
+  assert(cursor.find('some-key'));
+  disp([cursor.key, ': ', cursor.value]);
   clear cursor;
   [key, value] = database.first();
   disp([key, ': ', value]);

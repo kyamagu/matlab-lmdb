@@ -143,6 +143,20 @@ methods
   function cursor_value = cursor(this, varargin)
   %CURSOR Create a new cursor.
   %
+  % Options
+  %    'RDONLY' default false
+  %
+  % Example
+  %
+  %    cursor = database.cursor('RDONLY', true);
+  %    while cursor.next()
+  %      key = cursor.key;
+  %      value = cursor.value;
+  %    end
+  %    clear cursor;
+  %
+  % Clear a cursor before the database.
+  %
   % See also lmdb.Cursor
     assert(isscalar(this));
     cursor_value = lmdb.Cursor(this.id_, varargin{:});

@@ -179,6 +179,18 @@ methods
     end
     clear cursor;
   end
+
+  function result = keys(this)
+  %KEYS Get a cell array of all keys.
+    assert(isscalar(this));
+    result = LMDB_('keys', this.id_);
+  end
+
+  function result = values(this)
+  %VALUES Get a cell array of all values.
+    assert(isscalar(this));
+    result = LMDB_('values', this.id_);
+  end
 end
 
 end

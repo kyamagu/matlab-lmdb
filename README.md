@@ -57,6 +57,10 @@ Example
     end
     clear transaction;
 
+    % Dump.
+    keys = database.keys();
+    values = database.values();
+
 TODO
 ----
 

@@ -9,6 +9,7 @@ function testLMDB
     test_cursor;
     test_transaction;
     test_datatype;
+    test_dump;
   catch exception
     disp(exception.getReport());
   end
@@ -110,5 +111,13 @@ function test_datatype
   database.put('1', value);
   value2 = cast(database.get('1'), 'uint8');
   assert(all(value == value2));
+  clear database;
+end
+
+function test_dump
+  disp('Testing dump');
+  database = lmdb.DB('_testdb', 'RDONLY', true);
+  keys = database.keys;
+  values = database.values;
   clear database;
 end

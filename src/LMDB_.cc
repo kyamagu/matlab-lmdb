@@ -603,6 +603,42 @@ MEX_DEFINE(cursor_remove) (int nlhs, mxArray* plhs[],
   cursor->remove(flags);
 }
 
+MEX_DEFINE(keys) (int nlhs, mxArray* plhs[],
+                  int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Database* database = Session<Database>::get(input.get(0));
+  Transaction transaction(database, NULL, MDB_RDONLY);
+  Cursor cursor;
+  cursor.open(transaction.get(), database->getDBI());
+  vector<string> key_values;
+  while (cursor.get(MDB_NEXT)) {
+    Record* key = cursor.getKey();
+    key_values.push_back(string(key->begin(), key->end()));
+  }
+  cursor.close();
+  transaction.commit();
+  output.set(0, key_values);
+}
+
+MEX_DEFINE(values) (int nlhs, mxArray* plhs[],
+                    int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Database* database = Session<Database>::get(input.get(0));
+  Transaction transaction(database, NULL, MDB_RDONLY);
+  Cursor cursor;
+  cursor.open(transaction.get(), database->getDBI());
+  vector<string> value_values;
+  while (cursor.get(MDB_NEXT)) {
+    Record* value = cursor.getValue();
+    value_values.push_back(string(value->begin(), value->end()));
+  }
+  cursor.close();
+  transaction.commit();
+  output.set(0, value_values);
+}
+
 } // namespace
 
 MEX_DISPATCH

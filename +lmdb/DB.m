@@ -191,6 +191,12 @@ methods
     assert(isscalar(this));
     result = LMDB_('values', this.id_);
   end
+
+  function result = stat(this)
+  %STAT Get the environment statistics.
+    assert(isscalar(this));
+    result = LMDB_('stat', this.id_);
+  end
 end
 
 end

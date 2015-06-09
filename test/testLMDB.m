@@ -73,6 +73,7 @@ function test_transaction
   % No transaction.
   database.remove('1');
   assert(isempty(database.get('1')));
+  disp(database.stat());
   clear database; % Make sure database is not destroyed before transaction.
 end
 

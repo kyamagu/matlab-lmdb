@@ -270,6 +270,19 @@ mxArray* MxArray::from(const Record& value) {
   return MxArray(string(value.begin(), value.end())).release();
 }
 
+// Template specialization of MDB_stat to mxArray*.
+template <>
+mxArray* MxArray::from(const MDB_stat& stat) {
+  MxArray value(Struct());
+  value.set("psize", stat.ms_psize);
+  value.set("depth", stat.ms_depth);
+  value.set("branch_pages", stat.ms_branch_pages);
+  value.set("leaf_pages", stat.ms_leaf_pages);
+  value.set("overflow_pages", stat.ms_overflow_pages);
+  value.set("entries", stat.ms_entries);
+  return value.release();
+}
+
 // Session instance storage.
 template class Session<Database>;
 template class Session<Transaction>;
@@ -637,6 +650,16 @@ MEX_DEFINE(values) (int nlhs, mxArray* plhs[],
   cursor.close();
   transaction.commit();
   output.set(0, value_values);
+}
+
+MEX_DEFINE(stat) (int nlhs, mxArray* plhs[],
+                  int nrhs, const mxArray* prhs[]) {
+  InputArguments input(nrhs, prhs, 1);
+  OutputArguments output(nlhs, plhs, 1);
+  Database* database = Session<Database>::get(input.get(0));
+  MDB_stat stat;
+  mdb_env_stat(database->getEnv(), &stat);
+  output.set(0, stat);
 }
 
 } // namespace

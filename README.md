@@ -8,7 +8,7 @@ Matlab LMDB wrapper for UNIX environment.
 
 See also [matlab-leveldb](http://github.com/kyamagu/matlab-leveldb).
 
-The package does not contain any data serialization. Use `char` for storing keys and values. Those using [Caffe](https://github.com/BVLC/caffe) might want to use a Datum converter in [the caffe-extension branch](https://github.com/kyamagu/matlab-lmdb/tree/caffe-extension) also.
+The package does not contain any data serialization. Use `char` for storing keys and values. You will need to serialize any Matlab variables to directly save in the database. For example, using `num2str` and `str2double`. There are different serialization options, such as [this serialization package](https://github.com/kyamagu/matlab-serialization) or [JSON format](https://github.com/kyamagu/matlab-json). Those using [Caffe](https://github.com/BVLC/caffe) might want to use a Datum converter in [the caffe-extension branch](https://github.com/kyamagu/matlab-lmdb/tree/caffe-extension).
 
 Build
 -----
